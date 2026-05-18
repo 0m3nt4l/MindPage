@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MindPage Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;1,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0f0e0c;--ink2:#3d3b38;--ink3:#7a7670;--ink4:#b0aca6;
+  --bg:#f7f4ee;--bg2:#efebe2;--bg3:#e5e0d4;
+  --sage:#2d5a3d;--sage2:#3d7a52;--sage3:#c8dfc8;--sage4:#edf6ed;
+  --rose:#9b3a52;--rose2:#c4607a;--rose3:#f4dce4;
+  --amber:#7a5510;--amber2:#f0e8d0;--amber3:#fdf6e8;
+  --border:rgba(15,14,12,0.08);--border2:rgba(15,14,12,0.14);
+  --shadow:0 1px 3px rgba(15,14,12,0.07),0 4px 12px rgba(15,14,12,0.05);
+  --shadow2:0 4px 16px rgba(15,14,12,0.12);
+  --serif:'Fraunces',serif;--sans:'Instrument Sans',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+input,textarea,select,button{font-family:var(--sans)}
+
+/* ══ AUTH ══ */
+#auth-screen{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+.auth-box{width:100%;max-width:360px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px;box-shadow:var(--shadow2)}
+.auth-brand{text-align:center;margin-bottom:22px}
+.auth-brand .badge{display:inline-block;background:var(--rose3);color:var(--rose);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.auth-brand h1{font-family:var(--serif);font-size:24px;font-weight:400}
+.auth-brand p{font-size:13px;color:var(--ink3);margin-top:3px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px}
+.field input{padding:10px 12px;border:1px solid var(--border2);border-radius:8px;font-size:14px;color:var(--ink);background:var(--bg);outline:none;transition:border-color .15s}
+.field input:focus{border-color:var(--sage)}
+.btn-primary{width:100%;padding:11px;background:var(--sage);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary:hover{background:var(--sage2)}
+.btn-google{width:100%;padding:10px;background:var(--bg);color:var(--ink2);border:1px solid var(--border2);border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px;transition:all .15s}
+.btn-google:hover{background:var(--bg3)}
+.aerr{font-size:12px;color:var(--rose2);margin-top:6px;min-height:14px}
+.divider{display:flex;align-items:center;gap:10px;color:var(--ink4);font-size:12px;margin-bottom:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.auth-note{font-size:11px;color:var(--ink3);text-align:center;margin-top:14px;line-height:1.6}
+
+/* ══ ADMIN APP ══ */
+#admin-screen{display:none;min-height:100vh;flex-direction:column}
+#admin-header{background:#fff;border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.admin-brand{display:flex;align-items:center;gap:10px}
+.admin-brand-mark{width:30px;height:30px;background:var(--sage);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.admin-brand h1{font-family:var(--serif);font-size:20px;font-weight:400}
+.admin-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--rose3);color:var(--rose);text-transform:uppercase;letter-spacing:.5px}
+.admin-user{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink3)}
+.btn-signout{padding:6px 12px;background:transparent;border:1px solid var(--border2);border-radius:6px;font-size:12px;color:var(--ink3);cursor:pointer;transition:all .15s}
+.btn-signout:hover{background:var(--bg3);color:var(--ink)}
+
+#admin-body{padding:28px;max-width:1100px;margin:0 auto;width:100%}
+
+/* Stats bar */
+#stats-bar{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.stat-card{flex:1;min-width:140px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow)}
+.stat-num{font-family:var(--serif);font-size:28px;font-weight:400;color:var(--ink)}
+.stat-label{font-size:11px;color:var(--ink3);font-weight:500;margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.stat-pending .stat-num{color:var(--amber)}
+.stat-approved .stat-num{color:var(--sage)}
+.stat-banned .stat-num{color:var(--rose2)}
+
+/* Sections */
+.section{background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:20px;overflow:hidden;box-shadow:var(--shadow)}
+.section-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.section-head h2{font-family:var(--serif);font-size:17px;font-weight:400;font-style:italic}
+.section-count{font-size:12px;color:var(--ink3);background:var(--bg3);padding:2px 8px;border-radius:20px}
+.section-empty{padding:24px;text-align:center;font-size:13px;color:var(--ink3);font-style:italic}
+
+/* User rows */
+.user-row{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid var(--border);transition:background .1s}
+.user-row:last-child{border-bottom:none}
+.user-row:hover{background:var(--bg)}
+.u-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.u-av-pending{background:var(--amber3);color:var(--amber)}
+.u-av-approved{background:var(--sage4);color:var(--sage)}
+.u-av-banned{background:var(--rose3);color:var(--rose2)}
+.u-info{flex:1;min-width:0}
+.u-email{font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u-uid{font-size:10px;color:var(--ink4);font-family:monospace;margin-top:1px}
+.u-date{font-size:11px;color:var(--ink3);white-space:nowrap}
+.u-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-approve{padding:5px 12px;background:var(--sage);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-approve:hover{background:var(--sage2)}
+.btn-warn{padding:5px 12px;background:var(--amber2);color:var(--amber);border:1px solid rgba(122,85,16,.2);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-warn:hover{background:#e8d8a0}
+.btn-ban{padding:5px 12px;background:var(--rose3);color:var(--rose2);border:1px solid rgba(155,58,82,.2);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-ban:hover{background:#ecc8d0}
+.btn-unban{padding:5px 12px;background:var(--sage4);color:var(--sage);border:1px solid rgba(45,90,61,.2);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-unban:hover{background:var(--sage3)}
+.status-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.sb-pending{background:var(--amber3);color:var(--amber)}
+.sb-approved{background:var(--sage4);color:var(--sage)}
+.sb-banned{background:var(--rose3);color:var(--rose2)}
+
+/* Warning modal */
+#warn-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#warn-modal.open{display:flex}
+.warn-box{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:var(--shadow2)}
+.warn-box h3{font-family:var(--serif);font-size:18px;font-weight:400;margin-bottom:4px}
+.warn-box p{font-size:13px;color:var(--ink3);margin-bottom:14px}
+.warn-to{font-size:12px;font-weight:600;color:var(--ink2);background:var(--bg2);padding:6px 10px;border-radius:6px;margin-bottom:12px}
+.warn-textarea{width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:8px;font-size:14px;color:var(--ink);background:var(--bg);outline:none;resize:vertical;min-height:100px;transition:border-color .15s;font-family:var(--sans)}
+.warn-textarea:focus{border-color:var(--sage)}
+.warn-actions{display:flex;gap:8px;margin-top:12px}
+.btn-send-warn{padding:9px 18px;background:var(--amber);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-send-warn:hover{background:#9a7030}
+.btn-cancel-warn{padding:9px 14px;background:transparent;border:1px solid var(--border2);border-radius:7px;font-size:13px;color:var(--ink3);cursor:pointer}
+.warn-err{font-size:12px;color:var(--rose2);margin-top:6px}
+
+/* Refresh btn */
+.btn-refresh{padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+.btn-refresh:hover{background:var(--bg3)}
+
+/* Warnings history per user */
+.warn-history{background:var(--amber3);border-left:3px solid var(--amber);padding:8px 12px;margin:4px 0;border-radius:0 6px 6px 0;font-size:12px;color:var(--amber);line-height:1.5}
+.warn-history-date{font-size:10px;opacity:.7;margin-top:2px}
+
+/* Loading */
+.loading{padding:24px;text-align:center;color:var(--ink3);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-brand">
+      <div class="badge">Admin Only</div>
+      <h1>MindPage Admin</h1>
+      <p>Sign in with your admin account</p>
+    </div>
+    <button class="btn-google" id="google-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
+    <div class="divider">or</div>
+    <div class="field"><label>Email</label><input type="email" id="a-email" placeholder="admin@example.com" autocomplete="email"/></div>
+    <div class="field"><label>Password</label><input type="password" id="a-pass" placeholder="Password" autocomplete="current-password"/></div>
+    <button class="btn-primary" id="a-login-btn">Sign in</button>
+    <div class="aerr" id="a-err"></div>
+    <div class="auth-note">⚠ Keep this file LOCAL. Never deploy admin.html.</div>
+  </div>
+</div>
+
+<!-- WARNING MODAL -->
+<div id="warn-modal">
+  <div class="warn-box">
+    <h3>Send Warning</h3>
+    <p>This message will be stored and shown to the user next time they open the app.</p>
+    <div class="warn-to" id="warn-to-label">To: —</div>
+    <textarea class="warn-textarea" id="warn-message" placeholder="Type your warning message here…"></textarea>
+    <div class="warn-actions">
+      <button class="btn-send-warn" id="send-warn-btn">Send Warning</button>
+      <button class="btn-cancel-warn" id="cancel-warn-btn">Cancel</button>
+    </div>
+    <div class="warn-err" id="warn-err"></div>
+  </div>
+</div>
+
+<!-- ADMIN APP -->
+<div id="admin-screen">
+  <div id="admin-header">
+    <div class="admin-brand">
+      <div class="admin-brand-mark">🌿</div>
+      <h1>MindPage</h1>
+      <span class="admin-badge">Admin Panel</span>
+    </div>
+    <div class="admin-user">
+      <span id="admin-email">—</span>
+      <button class="btn-signout" id="signout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div id="admin-body">
+    <!-- Stats -->
+    <div id="stats-bar">
+      <div class="stat-card stat-pending"><div class="stat-num" id="stat-pending">—</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card stat-approved"><div class="stat-num" id="stat-approved">—</div><div class="stat-label">Approved</div></div>
+      <div class="stat-card stat-banned"><div class="stat-num" id="stat-banned">—</div><div class="stat-label">Banned</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Users</div></div>
+    </div>
+
+    <!-- Pending -->
+    <div class="section">
+      <div class="section-head">
+        <h2>⏳ Pending Approval</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="section-count" id="pending-count">0</span>
+          <button class="btn-refresh" id="refresh-btn">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="pending-list"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- Approved -->
+    <div class="section">
+      <div class="section-head">
+        <h2>✅ Approved Users</h2>
+        <span class="section-count" id="approved-count">0</span>
+      </div>
+      <div id="approved-list"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- Banned -->
+    <div class="section">
+      <div class="section-head">
+        <h2>🚫 Banned Users</h2>
+        <span class="section-count" id="banned-count">0</span>
+      </div>
+      <div id="banned-list"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, doc,
+  getDoc, setDoc, updateDoc, serverTimestamp, arrayUnion }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const fbApp = initializeApp({
+  apiKey:"AIzaSyAbHEMElVExF-5Oh7Ghj5GaLY034DmFNLE",
+  authDomain:"mindpage-e073d.firebaseapp.com",
+  projectId:"mindpage-e073d",
+  storageBucket:"mindpage-e073d.firebasestorage.app",
+  messagingSenderId:"705846438858",
+  appId:"1:705846438858:web:e398b06a9cd96fc627fd33"
+});
+const auth=getAuth(fbApp), db=getFirestore(fbApp), gp=new GoogleAuthProvider();
+
+const $=id=>document.getElementById(id);
+let currentAdmin=null, warnTargetUid=null, warnTargetEmail=null;
+let allUsers=[];
+
+// ═ AUTH ═══════════════════════════════════════════════════
+$("google-btn").onclick=async()=>{try{await signInWithPopup(auth,gp);}catch(e){$("a-err").textContent=e.message;}};
+$("a-login-btn").onclick=async()=>{
+  const email=$("a-email").value.trim(),pass=$("a-pass").value;
+  if(!email||!pass){$("a-err").textContent="Fill in both fields.";return;}
+  try{$("a-login-btn").disabled=true;await signInWithEmailAndPassword(auth,email,pass);}
+  catch(e){$("a-err").textContent=e.message;$("a-login-btn").disabled=false;}
+};
+$("signout-btn").onclick=()=>signOut(auth);
+
+onAuthStateChanged(auth,async u=>{
+  if(u){
+    currentAdmin=u;
+    $("auth-screen").style.display="none";
+    $("admin-screen").style.display="flex";
+    $("admin-email").textContent=u.displayName||u.email;
+    await loadUsers();
+  } else {
+    currentAdmin=null;
+    $("auth-screen").style.display="flex";
+    $("admin-screen").style.display="none";
+  }
+});
+
+// ═ LOAD USERS ═════════════════════════════════════════════
+async function loadUsers(){
+  $("pending-list").innerHTML=`<div class="loading">Loading…</div>`;
+  $("approved-list").innerHTML=`<div class="loading">Loading…</div>`;
+  $("banned-list").innerHTML=`<div class="loading">Loading…</div>`;
+
+  const snap=await getDocs(collection(db,"approved"));
+  allUsers=snap.docs.map(d=>({id:d.id,...d.data()}));
+
+  const pending=allUsers.filter(u=>u.status==="pending");
+  const approved=allUsers.filter(u=>u.status==="approved");
+  const banned=allUsers.filter(u=>u.status==="banned");
+
+  // Stats
+  $("stat-pending").textContent=pending.length;
+  $("stat-approved").textContent=approved.length;
+  $("stat-banned").textContent=banned.length;
+  $("stat-total").textContent=allUsers.length;
+  $("pending-count").textContent=pending.length;
+  $("approved-count").textContent=approved.length;
+  $("banned-count").textContent=banned.length;
+
+  renderList("pending-list", pending, "pending");
+  renderList("approved-list", approved, "approved");
+  renderList("banned-list", banned, "banned");
+}
+
+$("refresh-btn").onclick=loadUsers;
+
+function fmtDate(ts){
+  if(!ts) return "Unknown";
+  const d=ts.toDate?ts.toDate():new Date(ts);
+  return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+
+function renderList(containerId, users, type){
+  const container=$(containerId);
+  if(!users.length){container.innerHTML=`<div class="section-empty">No ${type} users</div>`;return;}
+  container.innerHTML="";
+  users.forEach(u=>{
+    const row=document.createElement("div");row.className="user-row";
+    const initials=(u.email||"?").slice(0,2).toUpperCase();
+    const avClass=`u-av-${type}`;
+
+    // Warnings history
+    const warns=(u.warnings||[]);
+    const warnHtml=warns.length?`<div style="margin-top:6px">${warns.slice(-2).map(w=>`<div class="warn-history">${esc(w.message)}<div class="warn-history-date">${fmtDate(w.sentAt)}</div></div>`).join("")}</div>`:"";
+
+    row.innerHTML=`
+      <div class="u-avatar ${avClass}">${initials}</div>
+      <div class="u-info">
+        <div class="u-email">${esc(u.email||"No email")}</div>
+        <div class="u-uid">${u.id}</div>
+        <div style="margin-top:3px">
+          <span class="status-badge sb-${type}">${type}</span>
+          ${warns.length?`<span style="font-size:10px;color:var(--amber);margin-left:6px">⚠ ${warns.length} warning${warns.length>1?"s":""}</span>`:""}
+        </div>
+        ${warnHtml}
+      </div>
+      <div class="u-date">${fmtDate(u.joinedAt)}</div>
+      <div class="u-actions" id="actions-${u.id}"></div>
+    `;
+    container.appendChild(row);
+    renderActions(u,type);
+  });
+}
+
+function renderActions(u, type){
+  const actions=$(`actions-${u.id}`);
+  actions.innerHTML="";
+
+  if(type==="pending"){
+    const approveBtn=document.createElement("button");
+    approveBtn.className="btn-approve";approveBtn.textContent="✓ Approve";
+    approveBtn.onclick=()=>approveUser(u);
+    actions.appendChild(approveBtn);
+  }
+
+  if(type!=="banned"){
+    const warnBtn=document.createElement("button");
+    warnBtn.className="btn-warn";warnBtn.textContent="⚠ Warn";
+    warnBtn.onclick=()=>openWarnModal(u.id,u.email);
+    actions.appendChild(warnBtn);
+
+    const banBtn=document.createElement("button");
+    banBtn.className="btn-ban";banBtn.textContent="🚫 Ban";
+    banBtn.onclick=()=>banUser(u);
+    actions.appendChild(banBtn);
+  }
+
+  if(type==="banned"){
+    const unbanBtn=document.createElement("button");
+    unbanBtn.className="btn-unban";unbanBtn.textContent="✓ Unban";
+    unbanBtn.onclick=()=>unbanUser(u);
+    actions.appendChild(unbanBtn);
+  }
+}
+
+// ═ ACTIONS ════════════════════════════════════════════════
+async function approveUser(u){
+  if(!confirm(`Approve ${u.email}?`))return;
+  await updateDoc(doc(db,"approved",u.id),{status:"approved",approvedAt:serverTimestamp(),approvedBy:currentAdmin.email});
+  await loadUsers();
+}
+
+async function banUser(u){
+  if(!confirm(`Ban ${u.email}? They will be locked out immediately.`))return;
+  await updateDoc(doc(db,"approved",u.id),{status:"banned",bannedAt:serverTimestamp(),bannedBy:currentAdmin.email});
+  await loadUsers();
+}
+
+async function unbanUser(u){
+  if(!confirm(`Unban ${u.email}? They will regain access.`))return;
+  await updateDoc(doc(db,"approved",u.id),{status:"approved",unbannedAt:serverTimestamp(),unbannedBy:currentAdmin.email});
+  await loadUsers();
+}
+
+// ═ WARNING MODAL ══════════════════════════════════════════
+function openWarnModal(uid, email){
+  warnTargetUid=uid;warnTargetEmail=email;
+  $("warn-to-label").textContent=`To: ${email}`;
+  $("warn-message").value="";$("warn-err").textContent="";
+  $("warn-modal").classList.add("open");
+  setTimeout(()=>$("warn-message").focus(),100);
+}
+$("cancel-warn-btn").onclick=()=>{$("warn-modal").classList.remove("open");warnTargetUid=null;};
+$("warn-modal").onclick=e=>{if(e.target===$("warn-modal"))$("warn-modal").classList.remove("open");};
+
+$("send-warn-btn").onclick=async()=>{
+  const msg=$("warn-message").value.trim();
+  $("warn-err").textContent="";
+  if(!msg){$("warn-err").textContent="Please write a warning message.";return;}
+  if(!warnTargetUid){return;}
+  try{
+    await updateDoc(doc(db,"approved",warnTargetUid),{
+      warnings:arrayUnion({
+        message:msg,
+        sentAt:new Date().toISOString(),
+        sentBy:currentAdmin.email
+      })
+    });
+    $("warn-modal").classList.remove("open");
+    warnTargetUid=null;
+    await loadUsers();
+  }catch(e){$("warn-err").textContent="Failed to send: "+e.message;}
+};
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+</script>
+</body>
+</html>
