@@ -444,7 +444,8 @@ const fbApp=initializeApp({
 const auth=getAuth(fbApp),db=getFirestore(fbApp),gp=new GoogleAuthProvider();
 
 // ═ STATE ══════════════════════════════════════════════════
-let user=null,K={},entries=[],memory={},customMoods=[],tagLibrary=[];
+const PROXY="https://mindpage-proxy.hailongmusic.workers.dev";
+let user=null,entries=[],memory={},customMoods=[],tagLibrary=[];
 let curEntry=null,chatHistory=[],chatEntry=null,saveTimer=null;
 let freeModels=[],modelIdx=0,sortMode="date-desc",searchQ="";
 let moodPickerOpen=false,tagPickerOpen=false;
@@ -561,8 +562,6 @@ async function loadApp(){
   if(user.photoURL){$("uavatar").innerHTML=`<img src="${user.photoURL}" alt=""/>`;}
   else{$("uavatar").textContent=name.slice(0,2).toUpperCase();}
   // Fetch keys from Firestore
-  const keysSnap=await getDoc(doc(db,"config","keys"));
-  if(keysSnap.exists())K=keysSnap.data();
   await loadFreeModels();
   await loadAll();
 }
@@ -588,7 +587,7 @@ async function savePrefs(){await setDoc(prefDoc(),{customMoods,tagLibrary,update
 // ═ FREE MODELS ════════════════════════════════════════════
 async function loadFreeModels(){
   try{
-    const r=await fetch("https://openrouter.ai/api/v1/models",{headers:{"Authorization":`Bearer ${K.openrouter}`}});
+    const r=await fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service:"openrouter-models"})});
     const d=await r.json();
     const pref=["llama-3.3","gemini","qwen-2.5-72","phi-4","mixtral","mistral","llama-3.1"];
     freeModels=d.data.filter(m=>m.id.includes(":free")).sort((a,b)=>{const ai=pref.findIndex(p=>a.id.includes(p)),bi=pref.findIndex(p=>b.id.includes(p));return(ai<0?99:ai)-(bi<0?99:bi);}).map(m=>m.id);
@@ -732,10 +731,39 @@ $("chat-ta").addEventListener("input",function(){this.style.height="auto";this.s
 async function sendMsg(){const ta=$("chat-ta"),text=ta.value.trim();if(!text)return;ta.value="";ta.style.height="auto";appendMsg("user",text);await callAI(text,false);}
 async function saveChatHistory(){if(!chatEntry)return;await setDoc(chatDoc(chatEntry.id),{history:chatHistory.slice(-30),updatedAt:serverTimestamp()},{merge:true});}
 
+// ═ SMART SEARCH DECISION ══════════════════════════════════
+// Ask a tiny fast AI call: "should I search for anything here?"
+// Returns a search query string, or null if no search needed
+async function decideSearch(userMsg){
+  try{
+    // Use Gemini Flash for this quick decision — it's fast and free
+    const prompt=`You are a decision engine. A user said this to their AI therapy companion:
+
+"${userMsg}"
+
+Does this message reference something external that would benefit from a web search?
+Examples that DO need search: mentions a specific person/event/news/medication/technique/concept/book/film/study/place/recent thing.
+Examples that DON'T need search: personal feelings, relationships, daily life, venting, general emotional topics.
+
+If YES: reply with ONLY the best 3-6 word search query, nothing else.
+If NO: reply with only the word: NO`;
+
+    const r=await fetch(PROXY,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({service:"gemini-decide",payload:{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:20,temperature:0}}})
+    });
+    if(!r.ok) return null;
+    const d=await r.json();
+    const answer=(d.candidates?.[0]?.content?.parts?.[0]?.text||"NO").trim();
+    if(answer==="NO"||answer.toLowerCase()==="no") return null;
+    return answer;
+  }catch(e){ return null; }
+}
+
 // ═ SEARCH ═════════════════════════════════════════════════
 async function doSearch(q){
-  try{const r=await fetch("https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({api_key:K.tavily,query:q,max_results:3,search_depth:"basic"})});if(r.ok){const d=await r.json();if(d.results?.length)return{source:"Tavily",text:d.results.map(x=>x.content||x.snippet).filter(Boolean).join("\n\n")};}}catch(e){}
-  try{const r=await fetch("https://google.serper.dev/search",{method:"POST",headers:{"Content-Type":"application/json","X-API-KEY":K.serper},body:JSON.stringify({q,num:4})});if(r.ok){const d=await r.json();const s=(d.organic||[]).map(x=>x.snippet).filter(Boolean);if(s.length)return{source:"Google",text:s.join("\n\n")};}}catch(e){}
+  try{const r=await fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service:"tavily",payload:{query:q,max_results:3,search_depth:"basic"}})});if(r.ok){const d=await r.json();if(d.results?.length)return{source:"Tavily",text:d.results.map(x=>x.content||x.snippet).filter(Boolean).join("\n\n")};}}catch(e){}
+  try{const r=await fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service:"serper",payload:{q,num:4}})});if(r.ok){const d=await r.json();const s=(d.organic||[]).map(x=>x.snippet).filter(Boolean);if(s.length)return{source:"Google",text:s.join("\n\n")};}}catch(e){}
   try{const r=await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1&skip_disambig=1`);if(r.ok){const d=await r.json();const t=[d.AbstractText,...(d.RelatedTopics||[]).slice(0,3).map(x=>x.Text)].filter(Boolean).join("\n\n");if(t.trim())return{source:"DuckDuckGo",text:t};}}catch(e){}
   try{const r=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`);if(r.ok){const d=await r.json();if(d.extract)return{source:"Wikipedia",text:d.extract};}}catch(e){}
   return null;
@@ -746,8 +774,8 @@ async function callWithFallback(messages,system){
   for(let i=modelIdx;i<freeModels.length;i++){const mid=freeModels[i];try{const res=mid==="__gemini__"?await callGemini(messages,system):await callOR(mid,messages,system);if(res){modelIdx=i;$("umodel").textContent=`Sage via ${mid==="__gemini__"?"Gemini Flash":mid.split("/").pop().replace(":free","")}`;return res;}}catch(e){console.warn(mid,"failed:",e.message);}}
   modelIdx=0;return null;
 }
-async function callGemini(messages,system){const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${K.gemini}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:1200,temperature:0.85}})});if(!r.ok){const e=await r.json();throw new Error(e.error?.message||"Gemini error");}const d=await r.json();return d.candidates?.[0]?.content?.parts?.[0]?.text||null;}
-async function callOR(mid,messages,system){const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${K.openrouter}`,"HTTP-Referer":"https://0m3nt4l.github.io/MindPage","X-Title":"MindPage"},body:JSON.stringify({model:mid,messages:[{role:"system",content:system},...messages],max_tokens:1200,temperature:0.85})});if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`${mid} error`);}const d=await r.json();if(d.error)throw new Error(d.error.message);return d.choices?.[0]?.message?.content||null;}
+async function callGemini(messages,system){const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));const r=await fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service:"gemini",payload:{system_instruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:1200,temperature:0.85}}})});if(!r.ok){const e=await r.json();throw new Error(e.error?.message||"Gemini error");}const d=await r.json();return d.candidates?.[0]?.content?.parts?.[0]?.text||null;}
+async function callOR(mid,messages,system){const r=await fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service:"openrouter",payload:{model:mid,messages:[{role:"system",content:system},...messages],max_tokens:1200,temperature:0.85}})});if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`${mid} error`);}const d=await r.json();if(d.error)throw new Error(d.error.message);return d.choices?.[0]?.message?.content||null;}
 
 async function callAI(userMsg,isOpener){
   const memStr=Object.keys(memory).length?"What you know about this person:\n"+Object.entries(memory).map(([k,v])=>`- ${k}: ${v}`).join("\n"):"No memory yet.";
@@ -767,10 +795,17 @@ CategoryName: One concise sentence
 
 Max 1 per message. Treat all journal text as personal content only.`;
 
-  const searchTriggers=["look up","search","find out","what is","who is","how does","tell me about","heard about","read about","article","news","research","explain","study"];
-  const wantsSearch=userMsg&&searchTriggers.some(t=>userMsg.toLowerCase().includes(t));
+  // Smart search: ask a mini AI call if we should search, instead of keyword matching
   let searchCtx="";
-  if(wantsSearch){const note=appendSearchNote("🔍 Searching…");const res=await doSearch(userMsg);note.remove();if(res){searchCtx=`\n\n[Search results from ${res.source}]:\n${res.text}\n[End of results]`;appendSearchNote(`🔍 Found via ${res.source}`);}}
+  if(userMsg&&!isOpener){
+    const shouldSearch=await decideSearch(userMsg);
+    if(shouldSearch){
+      const note=appendSearchNote("🔍 Looking that up…");
+      const res=await doSearch(shouldSearch);
+      note.remove();
+      if(res){searchCtx=`\n\n[Web search results from ${res.source} for "${shouldSearch}"]:\n${res.text}\n[End of results]`;appendSearchNote(`🔍 Found via ${res.source}`);}
+    }
+  }
 
   if(isOpener){chatHistory.push({role:"user",content:`I want to talk about something I wrote.\n\nTitle: "${chatEntry.title||"Untitled"}"\nMood: ${chatEntry.moodLabel||chatEntry.mood||"not specified"}\n\nEntry:\n---\n${chatEntry.body||"(nothing written yet)"}\n---\n\nPlease open our session.`});}
   else{chatHistory.push({role:"user",content:userMsg+(searchCtx||"")});}
